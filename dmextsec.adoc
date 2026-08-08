@@ -50,9 +50,20 @@ When M-mode debugging is disallowed (`mdbgen`=0) for a hart, any Quick Access op
 [NOTE]
 Quick Access abstract commands initiate a halt, execute the Program Buffer, and resume the selected hart. These halts cannot remain pending until debugging is allowed because the debugger blocks while waiting for completion. To address this, the hart would need to distinguish between Quick Access and other halt requests. Since Quick Access is an optional optimization, the Debug Module Security Extension avoids this additional hardware complexity by disallowing Quick Access when `mdbgen` is 0.
 
+==== Data and Program Buffer Registers
+
+The `data` and `progbuf` registers may hold values obtained while an operation or state access was permitted by the external debug security controls and is no longer permitted because those controls changed, including after `nsecdbg` changes from 1 to 0. The Debug Module must invalidate any contents of these registers that may have been obtained in this way. Invalidated bits must not be readable over the Debug Module Interface, readable through a hart-visible alias or from Program Buffer memory, used as an operand of an abstract command, or executed from the Program Buffer, and an abstract command that started before the controls changed must not make them valid.
+
+A write over the Debug Module Interface that takes effect makes valid only the bits it writes. An abstract command that was permitted and executed under the current external debug security controls and completes successfully makes valid only the bits it writes. Bits that are not written, or that are left UNSPECIFIED, remain invalid.
+
+[NOTE]
+Clearing these registers when the controls change is not sufficient on its own, because an abstract command issued earlier completes by writing its result into the `data` registers, and those registers may hold the operands of a command that is still executing.
+
 === System Bus Access 
 
 The System Bus Access must be checked by bus initiator protection mechanisms such as IOPMP cite:[iopmp] or WorldGuard cite:[worldguard]. The bus protection unit can return an error to the Debug Module on illegal accesses; in that case, the Debug Module will set `sbcs`.SBERROR to 6 (security fault error).
+
+When `nsecdbg` changes from 1 to 0, the Debug Module must invalidate the `sbdata` registers. Invalidated bits must not be readable over the Debug Module Interface or used by a subsequent system bus write, and a system bus access that started before the change must not make them valid. A write over the Debug Module Interface that takes effect makes valid only the bits it writes. A system bus read makes valid only the low bits corresponding to the access width selected by `sbcs`.SBACCESS; the remaining high bits remain invalid.
 
 [NOTE]
 Trusted entities like the RoT should configure IOPMP or equivalent protection before external debug is allowed.
