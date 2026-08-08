@@ -63,6 +63,17 @@ A dedicated error code, security fault error (CMDERR 6), is included in `abstrac
 
 Error status bits are internally maintained for each hart. The ALLSECFAULT and ANYSECFAULT fields in `dmstatus` indicate the error status of the currently selected harts. These error statuses are sticky and can only be cleared by writing 1 to `dmcs2`.ACKSECFAULT <<regdmcs2>>.
 
+=== Debug Security State Transitions
+
+A *restrictive debug transition* occurs when <<nsecdbg, `nsecdbg`>> changes from 1 to 0, or when a change in the external debug security controls makes the <<dbgaccpriv, debug access privilege>> of a hart accessible to the Debug Module more restrictive.
+
+Before a restrictive debug transition takes effect, every abstract command, Program Buffer execution and system bus access that began before it must have completed, or have been terminated so that it can no longer access hart or system state, update Debug Module state, or produce an architectural side effect.
+
+All implemented `data` and `progbuf` registers must then be set to zero, and on a change of `nsecdbg` all implemented `sbdata` registers must be set to zero as well. An implementation need not physically clear a register if its behavior is indistinguishable from that register having been set to zero.
+
+[NOTE]
+Otherwise a debugger allowed to debug only at a lower privilege could read a value obtained at a higher one, which after `nsecdbg` changes from 1 to 0 includes a value obtained while System Bus Access may bypass the bus initiator protections and debug operations execute with M-mode privilege. Clearing the registers when the controls change is not sufficient on its own, because an operation issued earlier completes by writing its result into `sbdata` or the `data` registers afterwards; ordering the clearing after those operations are quiescent is what prevents that. A reduction of the debug access privilege leaves `sbdata` alone, because System Bus Access is checked by the bus initiator protections rather than by a hart's debug privilege. A change to the configuration of those protections is not a restrictive debug transition, because the Debug Module is not notified of it. `sbaddress` is not cleared, because the debugger supplies it.
+
 [[nsecdbg]]
 === Non-secure Debug 
 
